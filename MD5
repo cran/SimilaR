@@ -1,4 +1,4 @@
-a7ef0993819f2f7e9e424ec0593a4faa *DESCRIPTION
+9c5ebc579dcbb3148145bdbac5c10ae9 *DESCRIPTION
 7ed575cfeb6f64a8e33e459ae2fe035d *NAMESPACE
 ee834ac13a46f3df4c34e4c6b64ef219 *R/RcppExports.R
 38a4592745cbb76379ce1fdcbb98477e *R/SimilaR_fromDirectory.R
@@ -47,8 +47,9 @@ d6d7ff031fd6825dbde01e462b6031ea *src/pdgcomparator.h
 722c4584d8852ff4067afc03ed2c0383 *src/pdgkernelcomparator.h
 7d517d6593c8f0bd808f7f04277d451b *src/pdgmykernelcomparator.cpp
 a5037fcfa86c07b7095eeeccb28ab90b *src/pdgmykernelcomparator.h
-575ee087780f0ccfef315f2a312efdf2 *src/postprocessingPDG.cpp
+95b807142fce860d734e36c5971ad29e *src/postprocessingPDG.cpp
 82d07c9486cd921d71d21e2bf2132805 *src/postprocessingPDG.h
 87c6745da90aa101fe49356c72b24e2c *tests/testthat.R
 3e62068bf3d02203b57b5f19b09e1045 *tests/testthat/test-SimilaR_fromDirectory.R
 523e71950969a7dfc4475817ca87babd *tests/testthat/test-SimilaR_fromTwoFunctions.R
+c1462280333fe898a9f98904638ca272 *tests/testthat/test-algorithm.R
