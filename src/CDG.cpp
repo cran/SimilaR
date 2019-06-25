@@ -26,6 +26,81 @@ using namespace Rcpp;
 using namespace std;
 using namespace boost;
 
+void typeOfVertex(SEXP s)
+{
+  if(TYPEOF(s) == SYMSXP)
+    Rcout << "SYMSXP" << endl;
+  else if(TYPEOF(s) == LANGSXP)
+    Rcout << "LANGSXP" << endl;
+  else if(TYPEOF(s) == LISTSXP)
+    Rcout << "LISTSXP" << endl;
+  else
+    Rcout << "other" << endl;
+}
+
+int CDGMaker::makeLexicalComparison(SEXP s1, SEXP s2)
+{
+  Environment ns = Environment::namespace_env("SimilaR");
+  Rcpp::Function myprint(ns["myprint"]);
+  string ss1 = string(as<CharacterVector>(myprint(s1))[0]);
+  string ss2 = string(as<CharacterVector>(myprint(s2))[0]);
+  // Rcout << ss1 << ", " << ss2 << endl;
+  return strcmp(ss1.c_str(), ss2.c_str());
+}
+
+bool CDGMaker::isReturnBranch(SEXP s, int& branchSize)
+{
+  // Rcout << "isReturnBranch()" << endl;
+  int myBranchSize = 0;
+  if (s == R_NilValue) {
+    branchSize = 0;
+    return false;
+  }
+  
+  if(TYPEOF(CAR(s))==LANGSXP && !strcmp(getLangName(CAR(s)), "{"))
+  {
+    // Rcout << "klamra" << endl;
+    s = CDR(CAR(s));
+  }
+  
+  for(SEXP s1 = s; s1 != R_NilValue; s1 = TYPEOF(s)==LISTSXP ? CDR(s1) : R_NilValue)
+  {
+    // Rcout << "for iteration" << endl;
+    myBranchSize++;
+    
+    // Rcout << "s1"<<endl;
+    // typeOfVertex(s1);
+    SEXP s2 = s1;
+    
+    if(TYPEOF(s) != SYMSXP && TYPEOF(s) != LANGSXP)
+     s2 = CAR(s1);
+    
+    // Rcout << "s2"<<endl;
+    // typeOfVertex(s2);
+    
+    //Rcout << graphUtils::getCanonicalName(getLangName(s2), variableName2variableName) << endl;
+    if(TYPEOF(s2)==LANGSXP && (graphUtils::getCanonicalName(getLangName(s2), variableName2variableName) == "return" || graphUtils::getCanonicalName(getLangName(s2), variableName2variableName) == "stop") )
+    {
+      // Rcout << "wykryto returna" << endl;
+      int theyBranchSize = 0;
+      isReturnBranch(CDR(s2), theyBranchSize);
+      myBranchSize += theyBranchSize;
+      branchSize += myBranchSize;
+      
+      return true;
+    }
+    
+    if(TYPEOF(s2) == LANGSXP)
+    {
+      int theyBranchSize = 0;
+      isReturnBranch(CDR(s2), theyBranchSize);
+      myBranchSize += theyBranchSize;
+    }
+  }
+  branchSize += myBranchSize;
+  return false;
+}
+
 string CDGMaker::constantToString(SEXP s)
 {
     if (TYPEOF(s) ==  LGLSXP)
@@ -364,7 +439,113 @@ void CDGMaker::makeIfNode(SEXP s,
     vertex_t node;
     vertex_t oldControlVertex = controlVertex;
     std::pair<edge_t, bool>  e;
-
+    
+    bool ifExists = true;
+    
+    for(SEXP s1 = s; s1 != R_NilValue; s1 = CDR(s1))
+    {
+      index++;
+    }
+    // Rcout << "index: " << index << endl;
+    bool elseExists = index == 4;
+    bool isIfReturnBranch = false;
+    bool isElseReturnBranch = false;
+    int branchSizeIf = 0;
+    int branchSizeElse = 0;
+    
+    bool remember_if = false;
+    
+    // Rcout << "elseExists: " << elseExists << endl;
+    // Rcout << "lastInstruction: " << lastInstruction << endl;
+    
+    SEXP if_child;
+    SEXP else_child;
+    
+    
+    if(elseExists)
+    {
+      index = 0;
+      for(SEXP s1 = s; s1 != R_NilValue; s1 = CDR(s1))
+      {
+        if(index == 2)
+        {
+          if(TYPEOF(CAR(s1))==LANGSXP)
+          {
+            if (TYPEOF(PRINTNAME(CAR(CAR(s1)))) == CHARSXP && !strcmp(CHAR(PRINTNAME(CAR(CAR(s1)))), "{"))
+            {
+              klamra_if = true;
+            }
+          }
+          
+          if(TYPEOF(CAR(s1)) != SYMSXP && TYPEOF(CAR(s1))!=LANGSXP)
+          {
+            // Rcout << "Prosty przypadek" << endl;
+            branchSizeIf = 1;
+            isIfReturnBranch = lastInstruction;
+            if_child = s1;
+          }
+          else
+          {
+            // Rcout << "Zaawansowany przypadek" << endl;
+            SEXP child = klamra_if ? s1 : ((TYPEOF(s1)==SYMSXP || TYPEOF(s1)==LANGSXP || TYPEOF(s1)==LISTSXP) ? (TYPEOF(CAR(s1))==SYMSXP || TYPEOF(CAR(s1)) == LANGSXP ? CAR(s1) : s1) : s1);
+            if_child = child;
+            if(isReturnBranch(child, branchSizeIf))
+            {
+              isIfReturnBranch = true;
+            }
+          }
+        }
+        else if(index == 3)
+        {
+          if(TYPEOF(CAR(s1))==LANGSXP)
+          {
+            if (TYPEOF(PRINTNAME(CAR(CAR(s1)))) == CHARSXP && !strcmp(CHAR(PRINTNAME(CAR(CAR(s1)))), "{"))
+            {
+              klamra_else = true;
+            }
+          }
+          if(TYPEOF(CAR(s1)) != SYMSXP && TYPEOF(CAR(s1))!=LANGSXP)
+          {
+            // Rcout << "Prosty przypadek" << endl;
+            branchSizeIf = 1;
+            isElseReturnBranch = lastInstruction;
+            else_child = s1;
+          }
+          else
+          {
+            // Rcout << "Zaawansowany przypadek" << endl;
+            SEXP child = klamra_else ? s1 : ((TYPEOF(s1)==SYMSXP || TYPEOF(s1)==LANGSXP || TYPEOF(s1)==LISTSXP) ? (TYPEOF(CAR(s1))==SYMSXP || TYPEOF(CAR(s1)) == LANGSXP ? CAR(s1) : s1) : s1);
+            else_child = child;
+            if(isReturnBranch(child, branchSizeElse))
+            {
+              isElseReturnBranch = true;
+            }
+          }
+        }
+        index++;
+      }
+      if(lastInstruction)
+      {
+        isIfReturnBranch = true;
+        isElseReturnBranch = true;
+      }
+    }
+    
+    if(!shouldBreakIf)
+    {
+      isIfReturnBranch = false;
+      isElseReturnBranch = false;
+    }
+    // Rcout << "isIfReturnBranch: " << isIfReturnBranch << endl;
+    // Rcout << "isElseReturnBranch: " << isElseReturnBranch << endl;
+    // Rcout << "branchSizeIf: " << branchSizeIf << endl;
+    // Rcout << "branchSizeElse: " << branchSizeElse << endl;
+    if(isIfReturnBranch && isElseReturnBranch && branchSizeIf == branchSizeElse)
+    {
+      branchSizeIf += makeLexicalComparison(if_child, else_child);
+    }
+    
+    index = 0;
     for(SEXP s1 = s; s1 != R_NilValue; s1 = CDR(s1))
     {
         if(index==0)
@@ -414,58 +595,50 @@ void CDGMaker::makeIfNode(SEXP s,
                 }
             }
 
-            vertex_t node2 = boost::add_vertex(g);
-            g[node2].color = color_if_part;
-            g[node2].name = "if_part";
-            g[node2].lastInstruction = lastInstruction;
-            g[node2].isLeftSideOfAssign = false;
-
-            e = add_edge(node, node2, g);
-            g[e.first].color = color_control_dependency;
-
-            e = add_edge(node, node2, g);
-            g[e.first].color = color_control_flow;
-            g[node2].uses = uses;
-
-            flowVertex = node2;
-            vertex_t* pnode = new vertex_t;
-            *pnode = node2;
-
-
-            if(TYPEOF(CAR(s1)) != SYMSXP && TYPEOF(CAR(s1))!=LANGSXP)
+            if((!isIfReturnBranch && !isElseReturnBranch) || (isIfReturnBranch && !isElseReturnBranch) || (isIfReturnBranch && isElseReturnBranch && branchSizeIf < branchSizeElse))
             {
-                makeConstantNode(CAR(
-                                     s1),
-                                 returnValueVariableName,node,flowVertex);
+              // Rcout << "Tworze ifpart" << endl;
+              
+              vertex_t node2 = boost::add_vertex(g);
+              g[node2].color = color_if_part;
+              g[node2].name = "if_part";
+              g[node2].lastInstruction = lastInstruction;
+              g[node2].isLeftSideOfAssign = false;
+  
+              e = add_edge(node, node2, g);
+              g[e.first].color = color_control_dependency;
+  
+              e = add_edge(node, node2, g);
+              g[e.first].color = color_control_flow;
+              g[node2].uses = uses;
+  
+              flowVertex = node2;
+              vertex_t* pnode = new vertex_t;
+              *pnode = node2;
+
+
+              if(TYPEOF(CAR(s1)) != SYMSXP && TYPEOF(CAR(s1))!=LANGSXP)
+              {
+                  makeConstantNode(CAR(s1),returnValueVariableName,node2,flowVertex);
+              }
+              else
+              {
+                
+                
+                  makeCDG_rec_cpp_wrapper(klamra_if ? s1 : ((TYPEOF(s1)==SYMSXP || TYPEOF(s1)==LANGSXP || TYPEOF(s1)==LISTSXP) ? (TYPEOF(CAR(s1))==SYMSXP || TYPEOF(CAR(s1)) == LANGSXP ? CAR(s1) : s1) : s1), 
+                                          returnValueVariableName,node2,
+                                          flowVertex, pnode,
+                                          structuredTransfersOfControl,
+                                          lastInstruction);
+              }
+              e = add_edge(flowVertex, node, g);
+              g[e.first].color = color_control_flow;
+              flowVertex = node;
             }
             else
-                makeCDG_rec_cpp_wrapper(klamra_if ? s1 : ((TYPEOF(s1)==
-                                                           SYMSXP ||
-                                                           TYPEOF(s1)==
-                                                           LANGSXP ||
-                                                           TYPEOF(s1)==
-                                                           LISTSXP) ? (TYPEOF(
-                                                                           CAR(
-                                                                               s1))
-                                                                       ==
-                                                                       SYMSXP
-                                                                       ||
-                                                                       TYPEOF(
-                                                                           CAR(
-                                                                               s1))
-                                                                       ==
-                                                                       LANGSXP
-                                                                       ? CAR(
-                                                                           s1)
-                                                                       : s1) :
-                                                          s1),
-                                        returnValueVariableName,node2,
-                                        flowVertex, pnode,
-                                        structuredTransfersOfControl,
-                                        lastInstruction);
-            e = add_edge(flowVertex, node, g);
-            g[e.first].color = color_control_flow;
-            flowVertex = node;
+            {
+              remember_if = true;
+            }
         }
         else if(index == 3)
         {
@@ -479,60 +652,80 @@ void CDGMaker::makeIfNode(SEXP s,
                 }
             }
 
-            vertex_t node2 = boost::add_vertex(g);
-            g[node2].color = color_if_part;
-            g[node2].name = "else_part";
-            g[node2].lastInstruction = lastInstruction;
-            g[node2].isLeftSideOfAssign = false;
-
-            e = add_edge(node, node2, g);
-            g[e.first].color = color_control_dependency;
-
-            e = add_edge(node, node2, g);
-            g[e.first].color = color_control_flow;
-            g[node2].uses = uses;
-
-            flowVertex = node2;
-            vertex_t* pnode = new vertex_t;
-            *pnode = node2;
-
-            if(TYPEOF(CAR(s1)) != SYMSXP && TYPEOF(CAR(s1))!=LANGSXP)
+            if((!isIfReturnBranch && !isElseReturnBranch) || (!isIfReturnBranch && isElseReturnBranch) || (isIfReturnBranch && isElseReturnBranch && branchSizeElse <= branchSizeIf)) // zamiast <= to zrobic porzadek liniowy porzadny!!!
             {
-                makeConstantNode(CAR(
-                                     s1),
-                                 returnValueVariableName,node,flowVertex);
+              // Rcout << "Tworze ifpart" << endl;
+              vertex_t node2 = boost::add_vertex(g);
+              g[node2].color = color_if_part;
+              g[node2].name = "else_part";
+              g[node2].lastInstruction = lastInstruction;
+              g[node2].isLeftSideOfAssign = false;
+  
+              e = add_edge(node, node2, g);
+              g[e.first].color = color_control_dependency;
+  
+              e = add_edge(node, node2, g);
+              g[e.first].color = color_control_flow;
+              g[node2].uses = uses;
+  
+              flowVertex = node2;
+              vertex_t* pnode = new vertex_t;
+              *pnode = node2;
+  
+              if(TYPEOF(CAR(s1)) != SYMSXP && TYPEOF(CAR(s1))!=LANGSXP)
+              {
+                  makeConstantNode(CAR(s1),returnValueVariableName,node2,flowVertex);
+              }
+              else
+                  makeCDG_rec_cpp_wrapper(klamra_else ? s1 : ((TYPEOF(s1)==
+                                                               SYMSXP ||
+                                                               TYPEOF(s1)==
+                                                               LANGSXP ||
+                                                               TYPEOF(s1)==
+                                                               LISTSXP) ? (TYPEOF(
+                                                                               CAR(
+                                                                                   s1))
+                                                                           ==
+                                                                           SYMSXP
+                                                                           ||
+                                                                           TYPEOF(
+                                                                               CAR(
+                                                                                   s1))
+                                                                           ==
+                                                                           LANGSXP
+                                                                           ? CAR(
+                                                                               s1)
+                                                                           : s1)
+                                                              : s1),
+                                          returnValueVariableName,node2,
+                                          flowVertex, pnode,
+                                          structuredTransfersOfControl,
+                                          lastInstruction);
+              e = add_edge(flowVertex, node, g);
+              g[e.first].color = color_control_flow;
+              flowVertex = node;
             }
             else
-                makeCDG_rec_cpp_wrapper(klamra_else ? s1 : ((TYPEOF(s1)==
-                                                             SYMSXP ||
-                                                             TYPEOF(s1)==
-                                                             LANGSXP ||
-                                                             TYPEOF(s1)==
-                                                             LISTSXP) ? (TYPEOF(
-                                                                             CAR(
-                                                                                 s1))
-                                                                         ==
-                                                                         SYMSXP
-                                                                         ||
-                                                                         TYPEOF(
-                                                                             CAR(
-                                                                                 s1))
-                                                                         ==
-                                                                         LANGSXP
-                                                                         ? CAR(
-                                                                             s1)
-                                                                         : s1)
-                                                            : s1),
-                                        returnValueVariableName,node2,
-                                        flowVertex, pnode,
-                                        structuredTransfersOfControl,
-                                        lastInstruction);
-            e = add_edge(flowVertex, node, g);
-            g[e.first].color = color_control_flow;
-            flowVertex = node;
+            {
+              makeCDG_rec_cpp_wrapper(klamra_else ? s1 : ((TYPEOF(s1)==SYMSXP || TYPEOF(s1)==LANGSXP || TYPEOF(s1)==LISTSXP) ? (TYPEOF(CAR(s1))==SYMSXP || TYPEOF(CAR(s1)) == LANGSXP ? CAR(s1) : s1) : s1), 
+                                      returnValueVariableName,controlVertex,
+                                      flowVertex, NULL,
+                                      NULL,
+                                      lastInstruction);
+            }
 
         }
         index++;
+    }
+    
+    if(remember_if)
+    {
+      // Rcout << "generuje pozostalego ifa" << endl;
+      makeCDG_rec_cpp_wrapper(if_child, 
+                              returnValueVariableName,controlVertex,
+                              flowVertex, NULL,
+                              NULL,
+                              lastInstruction);
     }
 }
 
@@ -546,34 +739,116 @@ void CDGMaker::makeForNode(SEXP s,
     string gen;
 
     vertex_t oldControlVertex = controlVertex;
-
+    
+    bool isForeach = false; // jesli true to raczej operujemy na elemencie, np. for(e in x), a false jak raczej for(i in 1:length(x))
+    list<string> arguments;
+    
     for(SEXP s1 = s; s1 != R_NilValue; s1 = CDR(s1))
     {
         if(index==0)
         {
             ;
-
         }
         else if(index == 1)
         {
-
             gen = CHAR(PRINTNAME(CAR(s1)));
         }
         else if(index == 2)
         {
             if(TYPEOF(CAR(s1)) == SYMSXP)
             {
-
+                // Rcout << "symbol w for" << endl;
+                isForeach = true;
                 uses.push_back(graphUtils::getCanonicalName(CHAR(PRINTNAME(CAR(s1))),
                                                    variableName2variableName));
+                arguments.push_back(graphUtils::getCanonicalName(CHAR(PRINTNAME(CAR(s1))),
+                                                                  variableName2variableName));
             }
             else if(TYPEOF(CAR(s1)) == LANGSXP)
             {
-                makeCallNode(CAR(
-                                 s1), returnValueVariableName,
+                size_t my_uses_size_before = uses.size();
+                makeCallNode(CAR(s1), returnValueVariableName,
                              controlVertex,
                              flowVertex, uses, true, false,false, false, false
                          );
+                size_t my_uses_size_after = uses.size();
+                auto it = uses.begin();
+                for(size_t i = 0; i < my_uses_size_before; ++i)
+                  ++it;
+                int my_uses_index = 0;
+                for(size_t i = my_uses_size_before; i < my_uses_size_after; ++i)
+                {
+                  arguments.push_back(*it);
+                  ++it;
+                  my_uses_index++;
+                }
+              
+              // tu sprawdzamy czy ta funkcja to nie byl moze :, seq_len, seq_along, seq
+              string fn = graphUtils::getCanonicalName(getLangName(CAR(s1)), variableName2variableName);
+              // Rcout << "Nazwa funkcji w for:" << fn << endl;
+              if(fn != "seq" && fn != ":" && fn != "seq_len" && fn != "seq_along")
+              {
+                isForeach = true;
+              }
+            }
+            
+            if(isForeach)
+            {
+              // Rcout << "jest Foreach, tworze sztuczne wierzcholki" << endl;
+              // jesli to foreach, to dodaj 1:length(to co wczesniej)
+              // length(x)
+              string functionName_length = string("length_")+std::to_string(global_CallNumber++);
+              list<string> length_uses, length_arguments;
+              length_uses.push_back(arguments.front());
+              length_arguments.push_back(arguments.front());
+              vertex_t node_length;
+              node_length = boost::add_vertex(g);
+              g[node_length].color = color_functionZeroArgument;
+              g[node_length].name = string("length()")+std::to_string(global_CallNumber++);
+              g[node_length].uses = length_uses;
+              g[node_length].lastInstruction = false;
+              g[node_length].gen = functionName_length;
+              g[node_length].functionName = "length";
+              g[node_length].originalFunctionName = "length";
+              g[node_length].arguments = length_arguments;
+              g[node_length].isLeftSideOfAssign = false;
+              g[node_length].isLeftAssign = false;
+              
+              std::pair<edge_t, bool> e = add_edge(flowVertex, node_length, g);
+              g[e.first].color = color_control_flow;
+              
+              e = add_edge(controlVertex, node_length, g);
+              g[e.first].color = color_control_dependency;
+              flowVertex = node_length;
+              
+              list<string> colon_uses, colon_arguments;
+              colon_uses.push_back("1");
+              colon_uses.push_back(functionName_length);
+              colon_arguments.push_back("1");
+              colon_arguments.push_back(functionName_length);
+              string functionName_colon = string("colon_")+concatenateStringList(colon_uses)+string("_")+std::to_string(global_CallNumber++);
+              vertex_t node_colon;
+              node_colon = boost::add_vertex(g);
+              g[node_colon].color = color_colon;
+              g[node_colon].name = string(":()")+std::to_string(global_CallNumber++);
+              g[node_colon].uses = colon_uses;
+              g[node_colon].lastInstruction = false;
+              g[node_colon].gen = functionName_colon; 
+              g[node_colon].functionName = "colon";
+              g[node_colon].originalFunctionName = "colon";
+              g[node_colon].arguments = colon_arguments;
+              g[node_colon].isLeftSideOfAssign = false;
+              g[node_colon].isLeftAssign = false;
+              
+              e = add_edge(flowVertex, node_colon, g);
+              g[e.first].color = color_control_flow;
+              
+              e = add_edge(controlVertex, node_colon, g);
+              g[e.first].color = color_control_dependency;
+              flowVertex = node_colon;
+              
+              uses.pop_front(); //upewnic sie !!!!!
+              uses.push_back(g[node_colon].gen);
             }
 
         }
@@ -599,12 +874,75 @@ void CDGMaker::makeForNode(SEXP s,
 
             flowVertex = node;
             list<pair<vertex_t*, vertex_t*> > structuredTransfersOfControl;
+            size_t vertices_count_before = num_vertices(g);
             makeCDG_rec_cpp_wrapper(s1, returnValueVariableName,
                                     node,flowVertex,NULL,
                                     &structuredTransfersOfControl,
                                     lastInstruction);
             makeStructuredTransfersOfControlForLoop(
                 node, &structuredTransfersOfControl);
+            size_t vertices_count_after = num_vertices(g);
+            
+            
+            
+            if(isForeach)
+            {
+              //  stworz bracket [[]]: korzysta z wektora wejsciowego, generuje cos, co podamy zamiast argumentu y (std:replace, jak w post)
+              list<string> bracket_uses, bracket_arguments;
+              string argument_name = arguments.front();
+              bracket_uses.push_back(g[node].gen); // zmienna iterujaca
+              bracket_uses.push_back(argument_name); //wektor z ktorego bierzemy
+              bracket_arguments.push_back(g[node].gen);
+              bracket_arguments.push_back(argument_name);
+              string functionName_bracket = string("[[_")+concatenateStringList(bracket_uses)+string("_")+std::to_string(global_CallNumber++);
+              vertex_t node_bracket;
+              node_bracket = boost::add_vertex(g);
+              g[node_bracket].color = color_twoBrackets;
+              g[node_bracket].name = string("[[()")+std::to_string(global_CallNumber++);
+              g[node_bracket].uses = bracket_uses;
+              g[node_bracket].lastInstruction = false;
+              g[node_bracket].gen = functionName_bracket; 
+              g[node_bracket].functionName = "[[";
+              g[node_bracket].originalFunctionName = "[[";
+              g[node_bracket].arguments = bracket_arguments;
+              g[node_bracket].isLeftSideOfAssign = false;
+              g[node_bracket].isLeftAssign = false;
+              
+              e = add_edge(flowVertex, node_bracket, g); //troche watpliwe
+              g[e.first].color = color_control_flow;
+              
+              
+              flowVertex = node_bracket;
+              
+              bool isFirstOccurenceFound = false;
+              
+              for(size_t j=vertices_count_before; j<vertices_count_after; ++j)
+              {
+                if(std::find(g[j].uses.begin(), g[j].uses.end() , gen) != g[j].uses.end() && !isFirstOccurenceFound)
+                {
+                  isFirstOccurenceFound = true;
+                  
+                  boost::graph_traits<GraphType>::in_edge_iterator in_e, in_e_end;
+                  for (tie(in_e, in_e_end) = in_edges(j, g);
+                       in_e != in_e_end; ++in_e)
+                  {
+                    if(g[*in_e].color == color_control_dependency)
+                    {
+                      e = add_edge(source(*in_e, g), node_bracket, g);
+                      g[e.first].color = color_control_dependency;
+                      break;
+                    }
+                  }
+                }
+                
+                std::replace (
+                    g[j].uses.begin(),
+                    g[j].uses.end(), gen, g[node_bracket].gen);
+              }
+              
+              
+            }
+            
             e = add_edge(flowVertex, node, g);
             g[e.first].color = color_control_flow;
             flowVertex = node;
@@ -689,6 +1027,8 @@ void CDGMaker::makeApplyNode(SEXP s,
                              bool lastInstruction,
                              bool isLeftAssign,
                              list<string>* additional_uses) {
+  // Rcout << "APPLY - start" << endl;
+  boost::graph_traits<GraphType>::in_edge_iterator in_e, in_e_end;
     vertex_t* entry = NULL;
 
     vertex_t oldControlVertex = controlVertex;
@@ -696,6 +1036,8 @@ void CDGMaker::makeApplyNode(SEXP s,
     list<string> my_uses;
     if(additional_uses != nullptr)
       my_uses = *additional_uses;
+    string vector_name;
+    int argument_index = 0;
     for (SEXP t = CDR(s); t != R_NilValue; t = CDR(t))
     {
         if(isSpecificFunction(CAR(t),"function"))
@@ -704,21 +1046,27 @@ void CDGMaker::makeApplyNode(SEXP s,
         }
         if(TYPEOF(CAR(t))==LANGSXP)
         {
-            size_t my_uses_size_before = uses.size();
+            size_t my_uses_size_before = my_uses.size();
             makeCallNode(CAR(
                              t), returnValueVariableName,
                          controlVertex, flowVertex,
                          my_uses, true, false,false, false, false);
-            size_t my_uses_size_after = uses.size();
+            size_t my_uses_size_after = my_uses.size();
 
-            auto it = uses.begin();
+            auto it = my_uses.begin();
             for(size_t i = 0; i < my_uses_size_before; ++i)
                 ++it;
-
+            // Rcout << "my_uses_size_before = " << my_uses_size_before << endl;
+            // Rcout << "my_uses_size_after = " << my_uses_size_after << endl;
+            int my_uses_index = 0;
             for(size_t i = my_uses_size_before; i < my_uses_size_after; ++i)
             {
-                arguments.push_back(*it);
-                ++it;
+              if(argument_index==0 && my_uses_index==0)
+                vector_name = *it;
+              
+              arguments.push_back(*it);
+              ++it;
+              my_uses_index++;
             }
         }
         else if(TYPEOF(CAR(t))==SYMSXP)
@@ -728,22 +1076,125 @@ void CDGMaker::makeApplyNode(SEXP s,
                                                   variableName2variableName));
             arguments.push_back(graphUtils::getCanonicalName(CHAR(PRINTNAME(CAR(t))),
                                                     variableName2variableName));
+            if(argument_index==0)
+              vector_name = graphUtils::getCanonicalName(CHAR(PRINTNAME(CAR(t))),
+                                                         variableName2variableName);
         }
         else
         {
             my_uses.push_back(constantToString(CAR(t)));
             arguments.push_back(constantToString(CAR(t)));
+            if(argument_index==0)
+              vector_name = constantToString(CAR(t));
         }
-
+        argument_index++;
     }
+    
+    // sztuczne wierzchoki (tworzenie wektora), wyciagnac do osobnej funkcji
+    // obliczam length(x)
+    string functionName_length = string("length_")+std::to_string(global_CallNumber++);
+    list<string> length_uses, length_arguments;
+    length_uses.push_back(vector_name);
+    length_arguments.push_back(vector_name);
+    vertex_t node_length;
+    node_length = boost::add_vertex(g);
+    g[node_length].color = color_functionZeroArgument;
+    g[node_length].name = string("length()")+std::to_string(global_CallNumber++);
+    g[node_length].uses = length_uses;
+    g[node_length].lastInstruction = false;
+    g[node_length].gen = functionName_length;
+    g[node_length].functionName = "length";
+    g[node_length].originalFunctionName = "length";
+    g[node_length].arguments = length_arguments;
+    g[node_length].isLeftSideOfAssign = false;
+    g[node_length].isLeftAssign = false;
+    
+    std::pair<edge_t, bool> e = add_edge(flowVertex, node_length, g);
+    g[e.first].color = color_control_flow;
+    
+    e = add_edge(controlVertex, node_length, g);
+    g[e.first].color = color_control_dependency;
+    flowVertex = node_length;
+    
+    // Rcout << "length od " << vector_name << endl;
+    
+    // vector(\"list\", length(x))
+    
+    list<string> vector_uses, vector_arguments;
+    vector_uses.push_back("list");
+    vector_uses.push_back(functionName_length);
+    vector_arguments.push_back("list");
+    vector_arguments.push_back(functionName_length);
+    string functionName_vector = string("vector_")+concatenateStringList(vector_uses)+string("_")+std::to_string(global_CallNumber++);
+    vertex_t node_vector;
+    node_vector = boost::add_vertex(g);
+    g[node_vector].color = color_functionOneArgument;
+    g[node_vector].name = string("vector()")+std::to_string(global_CallNumber++);
+    g[node_vector].uses = vector_uses;
+    g[node_vector].lastInstruction = false;
+    g[node_vector].gen = functionName_vector; // TUTAJ MUSI BYC TO, CO ZWRACA APPLY!!! // czy aby na pewno? chyba jednak nie, apply jak for generuje zmienna iterujaca
+    g[node_vector].functionName = "vector";
+    g[node_vector].originalFunctionName = "vector";
+    g[node_vector].arguments = vector_arguments;
+    g[node_vector].isLeftSideOfAssign = false;
+    g[node_vector].isLeftAssign = false;
+    
+    e = add_edge(flowVertex, node_vector, g);
+    g[e.first].color = color_control_flow;
+    
+    e = add_edge(controlVertex, node_vector, g);
+    g[e.first].color = color_control_dependency;
+    flowVertex = node_vector;
+    
+    // 1:length(x)
+    
+    list<string> colon_uses, colon_arguments;
+    colon_uses.push_back("1");
+    colon_uses.push_back(functionName_length);
+    colon_arguments.push_back("1");
+    colon_arguments.push_back(functionName_length);
+    string functionName_colon = string("colon_")+concatenateStringList(colon_uses)+string("_")+std::to_string(global_CallNumber++);
+    vertex_t node_colon;
+    node_colon = boost::add_vertex(g);
+    g[node_colon].color = color_colon;
+    g[node_colon].name = string(":()")+std::to_string(global_CallNumber++);
+    g[node_colon].uses = colon_uses;
+    g[node_colon].lastInstruction = false;
+    g[node_colon].gen = functionName_colon; 
+    g[node_colon].functionName = "colon";
+    g[node_colon].originalFunctionName = "colon";
+    g[node_colon].arguments = colon_arguments;
+    g[node_colon].isLeftSideOfAssign = false;
+    g[node_colon].isLeftAssign = false;
+    
+    e = add_edge(flowVertex, node_colon, g);
+    g[e.first].color = color_control_flow;
+    
+    e = add_edge(controlVertex, node_colon, g);
+    g[e.first].color = color_control_dependency;
+    flowVertex = node_colon;
+    
+    my_uses.push_back(g[node_colon].gen);
+    
+    // Rcout << "koniec sztucznych wierzcholkow" << endl;
+    // koniec sztucznych wierzcholkow
+    
 
     vertex_t node;
     node = boost::add_vertex(g);
     g[node].color = color_header;
     g[node].name = "apply";
     g[node].isLeftSideOfAssign = false;
+    string functionName = concatenateStringList(my_uses);
+    functionName = getLangName(s) + functionName;
+    uses.push_back(graphUtils::getCanonicalName(functionName,variableName2variableName));
+    if(isLeftAssign)
+    {
+      functionName = returnValueVariableName;
+    }
+    g[node].gen = functionName;
 
-    std::pair<edge_t, bool>  e = add_edge(oldControlVertex, node, g);
+    e = add_edge(oldControlVertex, node, g);
     g[e.first].color = color_control_dependency;
 
 
@@ -758,23 +1209,218 @@ void CDGMaker::makeApplyNode(SEXP s,
         {
             flowVertex = node;
             entry = &node;
+            
+            size_t vertices_count_before = num_vertices(g);
+            shouldBreakIf = false;
             makeCDGfromFunction(CAR(
                                     t), entry,
                                 returnValueVariableName, flowVertex);
+            shouldBreakIf = true;
             g[node].functionPosition = functionIndex;
+            
+            size_t vertices_count_after = num_vertices(g);
+            list<string>::iterator it_argument = arguments.begin();
+            
+            for(size_t i=vertices_count_before; i<vertices_count_after; ++i)
+            {
+              // Rcout << g[i].name << endl;
+              // Rcout << g[i].functionName << endl;
+              
+              if(g[i].color == color_parameter && it_argument != arguments.end())
+              {
+                // Rcout << "parameter - start" << endl;
+                
+                bool isParameterOfThisApply = false; // jesli to parametr zagniezdzonego apply, to pomin
+                for (tie(in_e, in_e_end) = in_edges(i, g);
+                     in_e != in_e_end; ++in_e)
+                {
+                  if(g[*in_e].color == color_control_dependency)
+                  {
+                    if(source(*in_e, g) == node)
+                    {
+                      isParameterOfThisApply = true;
+                      break;
+                    }
+                  }
+                }
+                if(isParameterOfThisApply)
+                {
+                  //  stworz bracket [[]]: korzysta z wektora wejsciowego, generuje cos, co podamy zamiast argumentu y (std:replace, jak w post)
+                  list<string> bracket_uses, bracket_arguments;
+                  string argument_name = *it_argument;
+                  bracket_uses.push_back(g[node].gen); // zmienna iterujaca
+                  bracket_uses.push_back(argument_name); //wektor z ktorego bierzemy
+                  bracket_arguments.push_back(g[node].gen);
+                  bracket_arguments.push_back(argument_name);
+                  string functionName_bracket = string("[[_")+concatenateStringList(bracket_uses)+string("_")+std::to_string(global_CallNumber++);
+                  vertex_t node_bracket;
+                  node_bracket = boost::add_vertex(g);
+                  g[node_bracket].color = color_twoBrackets;
+                  g[node_bracket].name = string("[[()")+std::to_string(global_CallNumber++);
+                  g[node_bracket].uses = bracket_uses;
+                  g[node_bracket].lastInstruction = false;
+                  g[node_bracket].gen = functionName_bracket; 
+                  g[node_bracket].functionName = "[[";
+                  g[node_bracket].originalFunctionName = "[[";
+                  g[node_bracket].arguments = bracket_arguments;
+                  g[node_bracket].isLeftSideOfAssign = false;
+                  g[node_bracket].isLeftAssign = false;
+                  
+                  e = add_edge(flowVertex, node_bracket, g); //troche watpliwe
+                  g[e.first].color = color_control_flow;
+                  flowVertex = node_bracket;
+                  
+                  ++it_argument;
+                  bool isFirstOccurenceFound = false;
+                  for(size_t j=i+1; j<vertices_count_after; ++j)
+                  {
+                    if(std::find(g[j].uses.begin(), g[j].uses.end() , g[i].gen) != g[j].uses.end() && !isFirstOccurenceFound)
+                    {
+                      isFirstOccurenceFound = true;
+                      
+                      for (tie(in_e, in_e_end) = in_edges(j, g);
+                           in_e != in_e_end; ++in_e)
+                      {
+                        if(g[*in_e].color == color_control_dependency)
+                        {
+                          e = add_edge(source(*in_e, g), node_bracket, g);
+                          g[e.first].color = color_control_dependency;
+                          break;
+                        }
+                      }
+                    }
+                    
+                    
+                    std::replace (
+                        g[j].uses.begin(),
+                        g[j].uses.end(), g[i].gen, g[node_bracket].gen);
+                  }
+                  // Rcout << "parameter - end" << endl;
+                }
+              }
+              
+              if(g[i].lastInstruction && g[i].name != "if" && g[i].name != "else_part" && g[i].name != "if_part")
+              {
+                // Rcout << "lastInstruction - start" << endl;
+                
+                
+                
+                g[i].gen = g[node_vector].gen;
+                
+                // Rcout << "last instruction" << endl;
+                // Rcout << g[i].name << endl;
+                // Rcout << g[i].functionName << endl;
+                // to co generuje wierzcholek dajemy do sztucznie utworzonego przypisania z [[]]  
+                list<string> bracket_uses, bracket_arguments;
+                bracket_uses.push_back(g[node].gen); // zmienna iterujaca
+                bracket_uses.push_back(g[node_vector].gen); //wektor zwracany
+                //bracket_uses.push_back(g[i].gen);
+                bracket_arguments.push_back(g[node].gen);
+                bracket_arguments.push_back(g[node_vector].gen);
+                // bracket_arguments.push_back(g[i].gen);
+                string functionName_bracket = string("[[_")+concatenateStringList(bracket_uses)+string("_")+std::to_string(global_CallNumber++);
+                vertex_t node_bracket;
+                node_bracket = boost::add_vertex(g);
+                g[node_bracket].color = color_twoBrackets;
+                g[node_bracket].name = string("[[()")+std::to_string(global_CallNumber++);
+                g[node_bracket].uses = bracket_uses;
+                g[node_bracket].lastInstruction = false;
+                g[node_bracket].gen = functionName_bracket; 
+                g[node_bracket].functionName = "[[";
+                g[node_bracket].originalFunctionName = "[[";
+                g[node_bracket].arguments = bracket_arguments;
+                g[node_bracket].isLeftSideOfAssign = true;
+                g[node_bracket].isLeftAssign = false;
+                
+                e = add_edge(flowVertex, node_bracket, g); //troche watpliwe
+                g[e.first].color = color_control_flow;
+                
+                
+                
+                for (tie(in_e, in_e_end) = in_edges(i, g);
+                     in_e != in_e_end; ++in_e)
+                {
+                  if(g[*in_e].color == color_control_dependency)
+                  {
+                    e = add_edge(source(*in_e, g), node_bracket, g);
+                    g[e.first].color = color_control_dependency;
+                    flowVertex = node_bracket;
+                    break;
+                  }
+                }
+                
+                
+                // i teraz assignment
+                
+                list<string> assignment_uses, assignment_arguments;
+                assignment_uses.push_back(g[node_vector].gen); //wektor zwracany
+                // assignment_uses.push_back(g[i].gen);
+                assignment_uses.push_back(g[node_bracket].gen);
+                assignment_arguments.push_back(g[node_vector].gen);
+                // assignment_arguments.push_back(g[i].gen);
+                assignment_arguments.push_back(g[node_bracket].gen);
+                // string functionName_assignment = string("<-_")+concatenateStringList(assignment_uses)+string("_")+std::to_string(global_CallNumber++);
+                vertex_t node_assignment;
+                node_assignment = boost::add_vertex(g);
+                g[node_assignment].color = color_assignment;
+                g[node_assignment].name = string("<-()")+std::to_string(global_CallNumber++);
+                g[node_assignment].uses = assignment_uses;
+                g[node_assignment].lastInstruction = false;
+                g[node_assignment].gen = g[node_vector].gen;
+                g[node_assignment].functionName = "<-";
+                g[node_assignment].originalFunctionName = "<-";
+                g[node_assignment].arguments = assignment_arguments;
+                g[node_assignment].isLeftSideOfAssign = false;
+                g[node_assignment].isLeftAssign = true;
+                
+                bracket_uses.push_back(g[node_assignment].gen);
+                g[node_bracket].uses = bracket_uses;
+                bracket_arguments.push_back(g[node_assignment].gen);
+                g[node_bracket].arguments = bracket_arguments;
+                
+                e = add_edge(flowVertex, node_assignment, g); //troche watpliwe
+                g[e.first].color = color_control_flow;
+                
+                for (tie(in_e, in_e_end) = in_edges(i, g);
+                     in_e != in_e_end; ++in_e)
+                {
+                  if(g[*in_e].color == color_control_dependency)
+                  {
+                    e = add_edge(source(*in_e, g), node_assignment, g);
+                    g[e.first].color = color_control_dependency;
+                    flowVertex = node_assignment;
+                    break;
+                  }
+                }
+                // Rcout << "lastInstruction - end" << endl;
+              }
+              
+              // Pytania: skad wziac nazwe argumentu?
+              // Odpowiedz: przejsc po tych wierzcholkach i pierwszy napotkany typu argument to argument
+              // if (wierzcholek korzysta z argumentu (y)) {
+              //    if(nie stworzono jeszcze pobierania z wektora wejsciowego)
+              //    {
+              //        stworz bracket [[]]: korzysta z wektora wejsciowego, generuje cos, co podamy zamiast argumentu y (std:replace, jak w post)
+              //    }
+              //    podmien na bracketa
+              // }
+              // if (wierzcholek jest typu return)
+              // {
+              //    to co generuje wierzcholek dajemy do sztucznie utworzonego przypisania z [[]]  
+              // }
+              
+              // usun zbedne wierzcholki: argumenty
+              
+            }
+      
         }
         functionIndex++;
     }
+    my_uses.pop_front(); // zeby w lapply(x, fun,...) ten x nie wskazywal na petle. bedzie wskazywal przez length
     g[node].uses = my_uses;
     g[node].lastInstruction = lastInstruction;
-    string functionName = concatenateStringList(my_uses);
-    functionName = getLangName(s) + functionName;
-    uses.push_back(graphUtils::getCanonicalName(functionName,variableName2variableName));
-    if(isLeftAssign)
-    {
-        functionName = returnValueVariableName;
-    }
-    g[node].gen = functionName;
+    
+    //g[node_vector].gen = g[node].gen; // TO DOSZLO JAKO MODYFIKACJA // jednak raczej nie, to dwa osobne byty
     g[node].functionName = getLangName(s);
     g[node].originalFunctionName = graphUtils::getCanonicalName(getLangName(
                                                            s),
@@ -783,6 +1429,8 @@ void CDGMaker::makeApplyNode(SEXP s,
     e = add_edge(flowVertex, node, g);
     g[e.first].color = color_control_flow;
     flowVertex = node;
+    
+    // Rcout << "APPLY - end" << endl;
 }
 
 void CDGMaker::makeNameSymbolNode(SEXP s,
@@ -902,6 +1550,7 @@ void CDGMaker::createNodeForCallNode(SEXP s,
     else if(!strcmp(getLangName(s), ":"))
     {
         g[node].color = color_colon;
+        // g[node].color = color_comparisonOperator;
     }
     else if(!strcmp(getLangName(s), "+")
             || !strcmp(getLangName(s), "-")
@@ -990,8 +1639,7 @@ void CDGMaker::makeStopIfNotNodesIfNecessary(SEXP s,
                                              bool isStopifnotCall
                                              )
 {
-    if(isSpecificFunction(s,
-                          "stopifnot") &&
+    if((isSpecificFunction(s, "stopifnot") || graphUtils::getCanonicalName(getLangName(s), variableName2variableName) == "stopifnot") &&
        !isSpecificFunction(CAR(t), "&&") && !isSpecificFunction(CAR(t), "&"))
     {
         createNodeForCallNode(s,returnValueVariableName, controlVertex,
@@ -1004,7 +1652,7 @@ void CDGMaker::makeStopIfNotNodesIfNecessary(SEXP s,
                           );
         g[flowVertex].color = color_stopifnot;
     }
-    if(isSpecificFunction(s, "stopifnot"))
+    if(isSpecificFunction(s, "stopifnot") || graphUtils::getCanonicalName(getLangName(s), variableName2variableName) == "stopifnot")
     {
         my_uses.clear();
         arguments.clear();
@@ -1374,7 +2022,6 @@ void CDGMaker::makeDplyrNode(SEXP s,
         }
     }
 
-
     if(isApplyFunction(s))
     {
         makeApplyNode(s, returnValueVariableName,
@@ -1398,7 +2045,6 @@ void CDGMaker::makeDplyrNode(SEXP s,
     else if(graphUtils::getCanonicalName(getLangName(s),
                            variableName2variableName) == "return")
     {
-
       if(TYPEOF(CAR(leftArgument)) == SYMSXP)
       {
           makeNameSymbolNode(CAR(leftArgument),
@@ -1416,6 +2062,130 @@ void CDGMaker::makeDplyrNode(SEXP s,
     {
         uses.insert(uses.end(), my_uses.begin(), my_uses.end());
     }
+}
+
+void CDGMaker::makeDplyrSymbolNode(SEXP s,
+                             string returnValueVariableName,
+                             const vertex_t& controlVertex,
+                             vertex_t& flowVertex,
+                             list<string>& uses,
+                             bool createNode,
+                             bool lastInstruction,
+                             bool isLeftAssign,
+                             bool isStopifnotCall,
+                             bool isLeftSideOfAssign
+)
+{
+  int usesAll = 0;
+  list<string> my_uses;
+  list<string> arguments;
+  int whichArgument = 0;
+  
+  SEXP leftArgument = CDR(s);
+  s = CAR(CDR(CDR(s)));
+  SEXP t = leftArgument;
+  
+  if(TYPEOF(CAR(t))==LANGSXP)
+  {
+    if(isSpecificFunction(s, "stopifnot") || graphUtils::getCanonicalName(getLangName(s), variableName2variableName) == "stopifnot")
+      stopifnotSEXP = s;
+    
+    size_t my_uses_size_before = my_uses.size();
+    makeCallNode(CAR(
+        t), returnValueVariableName,
+        controlVertex,
+        flowVertex, my_uses,
+        true,
+        isSpecificFunction(s,"return") && whichArgument == 1,
+        false,
+        isSpecificFunction(s,"stopifnot")||isStopifnotCall,
+        false
+    );
+    size_t my_uses_size_after = my_uses.size();
+    
+    auto it = my_uses.begin();
+    for(size_t i = 0; i < my_uses_size_before; ++i)
+      ++it;
+    
+    for(size_t i = my_uses_size_before; i < my_uses_size_after;
+    ++i)
+    {
+      arguments.push_back(*it);
+      ++it;
+    }
+    
+    makeStopIfNotNodesIfNecessary(s,t,returnValueVariableName,
+                                  controlVertex, flowVertex,
+                                  my_uses, uses, arguments,
+                                  lastInstruction, isLeftAssign,
+                                  isStopifnotCall);
+  }
+  else if(TYPEOF(CAR(t))==SYMSXP)
+  {
+    if(isSpecificFunction(s, "stopifnot") || graphUtils::getCanonicalName(getLangName(s), variableName2variableName) == "stopifnot")
+      stopifnotSEXP = s;
+    
+    my_uses.push_back(graphUtils::getCanonicalName(CHAR(PRINTNAME(CAR(t))),
+                                                   variableName2variableName));
+    arguments.push_back(graphUtils::getCanonicalName(CHAR(PRINTNAME(CAR(
+        t))),
+        variableName2variableName));
+    makeStopIfNotNodesIfNecessary(s,t,returnValueVariableName,
+                                  controlVertex, flowVertex,
+                                  my_uses, uses, arguments,
+                                  lastInstruction, isLeftAssign,
+                                  isStopifnotCall);
+  }
+  else
+  {
+    my_uses.push_back(constantToString(CAR(t)));
+    arguments.push_back(constantToString(CAR(t)));
+  }
+  usesAll++;
+  //za forem
+  
+  if(isApplyFunction(s))
+  {
+    makeApplyNode(s, returnValueVariableName,
+                  controlVertex, flowVertex, my_uses, createNode,
+                  lastInstruction,
+                  isLeftAssign,
+                  &my_uses);
+  }
+  else if(createNode &&
+          !isSpecificFunction(s,"stopifnot") &&
+          !(isStopifnotCall && isSpecificFunction(s, "&&")) && 
+          !isSpecificFunction(s, "return") && 
+          graphUtils::getCanonicalName(getLangName(s), variableName2variableName) != "return" &&
+          !(isStopifnotCall && graphUtils::getCanonicalName(getLangName(s), variableName2variableName) != "&&") && 
+          graphUtils::getCanonicalName(getLangName(s), variableName2variableName) != "stopifnot")
+  {
+    createNodeForCallNode(s,returnValueVariableName,
+                          controlVertex,flowVertex, my_uses, uses,
+                          lastInstruction,
+                          isLeftAssign, usesAll, arguments,
+                          isLeftSideOfAssign);
+  }
+  else if(graphUtils::getCanonicalName(getLangName(s),
+                                       variableName2variableName) == "return")
+  {
+    if(TYPEOF(CAR(leftArgument)) == SYMSXP)
+    {
+      makeNameSymbolNode(CAR(leftArgument),
+                         returnValueVariableName,controlVertex,flowVertex,
+                         true);
+    }
+    else if(TYPEOF(CAR(leftArgument)) != LANGSXP)
+    {
+      makeConstantNode(CAR(leftArgument), returnValueVariableName,
+                       controlVertex,flowVertex);
+    }
+    
+  }
+  else
+  {
+    uses.insert(uses.end(), my_uses.begin(), my_uses.end());
+  }
 }
 
 void CDGMaker::makeCallNode(SEXP s,
@@ -1449,6 +2219,12 @@ void CDGMaker::makeCallNode(SEXP s,
                                variableName2variableName) == "return" &&
            TYPEOF(CAR(CDR(s))) == SYMSXP)
         {
+          ; //zeby zadzialalo:
+          // y <- ...
+          // return(y)
+          //
+          // return(...)
+          // ostatecznie usuwam w post processingu
             makeNameSymbolNode(CAR(CDR(
                                        s)),
                                returnValueVariableName,controlVertex,flowVertex,
@@ -1489,6 +2265,31 @@ void CDGMaker::makeCallNode(SEXP s,
                            isStopifnotCall,
                            isLeftSideOfAssign);
     }
+    else if(!strcmp(getLangName(s), "!"))
+    {
+      makeCallNode(CAR(CDR(
+          s)),returnValueVariableName,
+          controlVertex, flowVertex,
+          uses, createNode, lastInstruction, isLeftAssign,
+          isStopifnotCall);
+      
+      // if(!strcmp(getLangName(CAR(CDR(s))), "<=") || 
+      //    !strcmp(getLangName(CAR(CDR(s))), "<")  || 
+      //    !strcmp(getLangName(CAR(CDR(s))), ">=") || 
+      //    !strcmp(getLangName(CAR(CDR(s))), ">")  ||
+      //    !strcmp(getLangName(CAR(CDR(s))), "==")  ||
+      //    !strcmp(getLangName(CAR(CDR(s))), "!=") ||
+      //    (!strcmp(getLangName(CAR(CDR(s))), "(")  && !strcmp(getLangName(CAR(CDR(CAR(CDR(s))))), ">")) ||
+      //    (!strcmp(getLangName(CAR(CDR(s))), "(")  && !strcmp(getLangName(CAR(CDR(CAR(CDR(s))))), ">=")) ||
+      //    (!strcmp(getLangName(CAR(CDR(s))), "(")  && !strcmp(getLangName(CAR(CDR(CAR(CDR(s))))), "<")) ||
+      //    (!strcmp(getLangName(CAR(CDR(s))), "(")  && !strcmp(getLangName(CAR(CDR(CAR(CDR(s))))), "<=")) ||
+      //    (!strcmp(getLangName(CAR(CDR(s))), "(")  && !strcmp(getLangName(CAR(CDR(CAR(CDR(s))))), "==")) ||
+      //    (!strcmp(getLangName(CAR(CDR(s))), "(")  && !strcmp(getLangName(CAR(CDR(CAR(CDR(s))))), "!="))
+      //    )
+      // {
+      //   
+      // }
+    }
     else
     {
         if(isApplyFunction(s))
@@ -1512,6 +2313,17 @@ void CDGMaker::makeCallNode(SEXP s,
                                      isLeftAssign,
                                      isStopifnotCall,
                                      isLeftSideOfAssign);
+           }
+           else if(TYPEOF(CAR(CDR(CDR(s)))) == SYMSXP && graphUtils::getCanonicalName(getLangName(CAR(CDR(CDR(s)))),
+                          variableName2variableName) != "{")
+           {
+             makeDplyrSymbolNode(s, returnValueVariableName,
+                           controlVertex,
+                           flowVertex,
+                           uses, createNode, lastInstruction,
+                           isLeftAssign,
+                           isStopifnotCall,
+                           isLeftSideOfAssign);
            }
            else
            {
@@ -1789,7 +2601,7 @@ void CDGMaker::makeCDG_rec_cpp_wrapper(
                                     s)), returnValueVariableName,
                             controlVertex, flowVertex,
                             if_node,structuredTransfersOfControl,
-                            true);
+                            lastInstruction);
         }
         else
         {

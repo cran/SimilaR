@@ -1,32 +1,33 @@
 Package: SimilaR
-Version: 1.0.3
-Date: 2019-02-25
+Version: 1.0.4
+Date: 2019-06-25
 Title: R Source Code Similarity Evaluation
-Description: An Implementation of a novel method to determine similarity of R 
-    functions based on program dependence graphs, 
-    see Bartoszuk, Gagolewski (2017) <doi:10.1109/FUZZ-IEEE.2017.8015582>. 
-    Possible use cases include
-    plagiarism detection among students' homework assignments.
+Description: An implementation of a novel method to quantify the similarity
+    the code-base of R functions by means of program dependence graphs.
+    Possible use cases include detection of code clones for improving
+    software quality and of plagiarism among students' homework assignments.
 URL: http://similar.rexamine.com/
 BugReports: https://github.com/bartoszukm/SimilaR/issues
 Type: Package
-Depends: R (>= 3.1.0), stringi
+Depends: R (>= 3.1.0)
 License: GPL (>= 3)
 Authors@R: c(
     person("Maciej", "Bartoszuk", role = c("aut", "cre"),
-    email = "bartoszuk@rexamine.com"),
+    email = "bartoszuk@rexamine.com",
+    comment = c(ORCID = "0000-0001-6088-8273")),
     person("Marek", "Gagolewski", role = "aut",
-    email = "gagolews@rexamine.com")
+    email = "marek@gagolewski.com",
+    comment = c(ORCID = "0000-0003-0637-6028"))
     )
-Imports: Rcpp (>= 0.12.0)
+Imports: Rcpp (>= 0.12.0), stringi
 Suggests: testthat
 LinkingTo: Rcpp (>= 0.12.0), BH
 SystemRequirements: C++11
-RoxygenNote: 6.0.1
+RoxygenNote: 6.1.1
 NeedsCompilation: yes
-Packaged: 2019-02-25 12:37:15 UTC; bartoszukm
-Author: Maciej Bartoszuk [aut, cre],
-  Marek Gagolewski [aut]
+Packaged: 2019-06-25 12:36:58 UTC; bartoszukm
+Author: Maciej Bartoszuk [aut, cre] (<https://orcid.org/0000-0001-6088-8273>),
+  Marek Gagolewski [aut] (<https://orcid.org/0000-0003-0637-6028>)
 Maintainer: Maciej Bartoszuk <bartoszuk@rexamine.com>
 Repository: CRAN
-Date/Publication: 2019-02-25 17:20:11 UTC
+Date/Publication: 2019-06-25 13:10:03 UTC

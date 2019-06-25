@@ -34,6 +34,7 @@ const unsigned long long int global_CallNumber_startValue;
 unsigned long long int global_CallNumber;
 map<string, string> variableName2variableName;
 SEXP stopifnotSEXP;
+bool shouldBreakIf;
 
 string constantToString(SEXP s);
 string concatenateStringList(list<string> l);
@@ -156,6 +157,16 @@ void makeDplyrNode(SEXP s,
                                 bool isLeftAssign = false,
                                 bool isStopifnotCall = false,
                                 bool isLeftSideOfAssign = false);
+void makeDplyrSymbolNode(SEXP s,
+                   string returnValueVariableName,
+                   const vertex_t& controlVertex,
+                   vertex_t& flowVertex,
+                   list<string>& uses,
+                   bool createNode = true,
+                   bool lastInstruction = false,
+                   bool isLeftAssign = false,
+                   bool isStopifnotCall = false,
+                   bool isLeftSideOfAssign = false);
 void makeNextNode(SEXP s,
                   string returnValueVariableName,
                   const vertex_t& controlVertex,
@@ -186,11 +197,16 @@ void makeCDG_rec_cpp_wrapper(SEXP s,
                                        vertex_t*> >
                              *structuredTransfersOfControl,
                              bool lastInstruction);
+
+bool isReturnBranch(SEXP s, int& branchSize);
+int makeLexicalComparison(SEXP s1, SEXP s2);
+
 public:
 CDGMaker() :
     global_CallNumber_startValue(0),
-    global_CallNumber(global_CallNumber_startValue){
-}
+    global_CallNumber(global_CallNumber_startValue),
+    shouldBreakIf(true){
+    }
 
 GraphType makeCDG_cpp(SEXP obj, vertex_t*& entry);   //zwracany do R graf to lista 3 rzeczy: macierz sasiedztwa, kolory i texty wierzcholkow
 };

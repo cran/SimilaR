@@ -63,73 +63,136 @@ void PostprocessingPDG::changeWhileLoop(GraphType& g)
     set<string> uses;
     set<string> variablesChangedInLoop;
     map<string, vertex_t> initialVertices;
-    for (next = vi; vi != vi_end; vi = next) {
-        ++next;
-        if(g[*vi].name == "while")
-        {
-            for (tie(in_e, in_e_end) = in_edges(*vi, g); in_e != in_e_end;
-                 ++in_e)
-            {
-                if(g[*in_e].color != color_data_dependency) continue;
-                vertex_t nei = source(*in_e,g);
-                uses.insert(g[nei].uses.begin(), g[nei].uses.end());
-                for (tie(in_e2, in_e_end2) = in_edges(nei, g);
-                     in_e2 != in_e_end2; ++in_e2)
-                {
-                    vertex_t nei2 = source(*in_e2,g);
-                    if(uses.find(g[nei2].gen) != uses.end())
-                    {
-                        initialVertices[g[nei2].gen] = nei2;
-                    }
-                }
-            }
-
-
-
-            for (tie(out_e, out_e_end) = out_edges(*vi, g); out_e != out_e_end;
-                 ++out_e)
-            {
-                vertex_t nei = target(*out_e,g);
-                if(uses.find(g[nei].gen) != uses.end())
-                {
-                    variablesChangedInLoop.emplace(g[nei].gen);
-                    for (tie(out_e2, out_e_end2) = out_edges(nei, g);
-                         out_e2 != out_e_end2; ++out_e2)
-                    {
-                        if(g[*out_e2].color != color_data_dependency) continue;
-                        bool paired = false;
-                        for (tie(out_e3, out_e_end3) = out_edges(*vi, g);
-                             out_e3 != out_e_end3; ++out_e3)
-                        {
-                            if(g[*out_e3].color !=
-                               color_data_dependency) continue;
-                            if(target(*out_e2,g) == target(*out_e3,g))
-                            {
-                                paired = true;
-                                break;
-                            }
-                        }
-                        if(!paired)
-                        {
-                            std::pair<edge_t,
-                                      bool> e = add_edge(*vi, target(*out_e2,
-                                                                     g), g);
-                            g[e.first].color = color_data_dependency;
-                            remove_edge(initialVertices[g[nei].gen],
-                                        target(*out_e2, g), g);
-                        }
-                    }
-                    if(*next == nei)
-                    {
-                        ++next;
-                    }
-                    clear_vertex(nei, g);
-                    remove_vertex(nei, g);
-                }
-
-            }
-
-        }
+    vector<vertex_t> toRemove;
+    bool changes = true;
+    while(changes)
+    {
+      changes = false;
+      tie(vi, vi_end) = vertices(g);
+      initialVertices.clear();
+      variablesChangedInLoop.clear();
+      uses.clear();
+      toRemove.clear();
+      for (next = vi; vi != vi_end; vi = next) {
+          ++next;
+          if(g[*vi].name == "while") //szukam petli while
+          {
+              for (tie(in_e, in_e_end) = in_edges(*vi, g); in_e != in_e_end;
+                   ++in_e)
+              {
+                  if(g[*in_e].color != color_data_dependency) continue;
+                  vertex_t nei = source(*in_e,g); // szukam warunku, czyli po data dependency, np. <=
+                  
+                  // Rcout << "nei:" << endl;
+                  // Rcout << "gen: " << g[nei].gen << endl;
+                  // Rcout << g[nei].color << " " << g[nei].name << ", " << g[nei].functionName << endl;
+                  // for(auto s : g[nei].uses)
+                  // {
+                  //   Rcout << s << ",";
+                  // }
+                  // Rcout << endl << "---" << endl;
+                  
+                  uses.insert(g[nei].uses.begin(), g[nei].uses.end()); // w uses to z czego korzysta warunek, liczymy ze ze zmiennej iterujacej, ale tez np. z dlugosci
+                  for (tie(in_e2, in_e_end2) = in_edges(nei, g);
+                       in_e2 != in_e_end2; ++in_e2) // chodzimy po sasiadach warunku, czyli po "i" i dlugosci
+                  {
+                      vertex_t nei2 = source(*in_e2,g);
+                      if(uses.find(g[nei2].gen) != uses.end()) // upewniamy sie ze sasiad generuje to z czego korzysta warunek
+                      {
+                          initialVertices[g[nei2].gen] = nei2;
+                        
+                          // Rcout << "initialVertices:" << endl;
+                          // Rcout << "gen: " << g[nei2].gen << endl;
+                          // Rcout << g[nei2].color << " " << g[nei2].name << ", " << g[nei2].functionName << endl;
+                          // for(auto s : g[nei2].uses)
+                          // {
+                          //   Rcout << s << ",";
+                          // }
+                          // Rcout << endl << "---" << endl;
+                          
+                          if(g[nei2].uses.size() == 1)
+                          {
+                            toRemove.push_back(nei2);
+                          }
+                      }
+                  }
+              }
+  
+  
+              // w tym momencie mamy juz inicjalne wierzcholki, czyli dlugosc i zmienna iterujaca
+              for (tie(out_e, out_e_end) = out_edges(*vi, g); out_e != out_e_end; // chodzimy po ciele petli
+                   ++out_e)
+              {
+                  vertex_t nei = target(*out_e,g);
+                  if(uses.find(g[nei].gen) != uses.end()) // szukamy czy ktos w ciele nie nadpisuje wartosci np. zmiennej iterujacej czy dlugosci (niemozliwe), np. i <- i + 1
+                  {
+                    changes = true;
+                    // Rcout << "variablesChangedInLoop:" << endl;
+                    // Rcout << "gen: " << g[nei].gen << endl;
+                    // Rcout << g[nei].color << " " << g[nei].name << ", " << g[nei].functionName << endl;
+                    // for(auto s : g[nei].uses)
+                    // {
+                    //   Rcout << s << ",";
+                    // }
+                    // Rcout << endl << "---" << endl;
+                    
+                      variablesChangedInLoop.emplace(g[nei].gen);
+                      for (tie(out_e2, out_e_end2) = out_edges(nei, g); // chodzimy po sasiadach (data sasiadach) tego wierzcholka i <- i + 1
+                           out_e2 != out_e_end2; ++out_e2)
+                      {
+                          if(g[*out_e2].color != color_data_dependency) continue;
+                          bool paired = false;
+                          for (tie(out_e3, out_e_end3) = out_edges(*vi, g); // chodzimy po ciele petli raz jeszcze, ale po data sasiadach
+                               out_e3 != out_e_end3; ++out_e3)
+                          {
+                              if(g[*out_e3].color !=
+                                 color_data_dependency) continue;
+                              if(target(*out_e2,g) == target(*out_e3,g)) // jak i <- i + 1 wskazuje przez data na to samo, co while, to ok
+                              {
+                                  paired = true;
+                                  break;
+                              }
+                          }
+                          if(!paired)
+                          {
+                            // Rcout << "not paired" << endl;
+                              std::pair<edge_t,
+                                        bool> e = add_edge(*vi, target(*out_e2,
+                                                                       g), g); //gdy ktos uzywa zmiennej iterujacej, to dodaje zaleznosc od while
+                              g[e.first].color = color_data_dependency;
+                              remove_edge(initialVertices[g[nei].gen], // a usuwam zaleznosc miedzy tworzeniem tej zmiennej przed petla (i<-1) a jej uzyciem
+                                          target(*out_e2, g), g);
+                          }
+                      }
+                      if(*next == nei)
+                      {
+                          ++next;
+                      }
+                      
+                      // Rcout << "remove:" << endl;
+                      // Rcout << "gen: " << g[nei].gen << endl;
+                      // Rcout << g[nei].color << " " << g[nei].name << ", " << g[nei].functionName << endl;
+                      // for(auto s : g[nei].uses)
+                      // {
+                      //   Rcout << s << ",";
+                      // }
+                      // Rcout << endl << "---" << endl;
+                      
+                      clear_vertex(nei, g); // usuwam i <- i + 1
+                      remove_vertex(nei, g);
+                  }
+  
+              }
+              
+              for(size_t i=0;i<toRemove.size(); ++i)
+              {
+                clear_vertex(toRemove[i], g);
+                remove_vertex(toRemove[i], g);
+              }
+              toRemove.clear();
+  
+          }
+      }
     }
 
     for(auto it = initialVertices.begin(); it!=initialVertices.end(); ++it)
@@ -225,14 +288,16 @@ void PostprocessingPDG::mergeTheSameInstructions(GraphType& g)
         tie(vi, vi_end) = vertices(g);
         for (next = vi; vi != vi_end && !changes; vi = next) {
             ++next;
-            if(g[*vi].color == color_functionZeroArgument || g[*vi].color ==
-               color_functionOneArgument
-               || g[*vi].color == color_functionTwoArguments || g[*vi].color ==
-               color_functionThreeArguments
-               || g[*vi].color == color_functionFourOrMoreArguments ||
-               g[*vi].color == color_oneBracketSingle
-               || g[*vi].color == color_oneBracketDouble || g[*vi].color ==
-               color_twoBrackets)
+            if(g[*vi].color == color_functionZeroArgument || 
+              g[*vi].color == color_functionOneArgument ||
+              g[*vi].color == color_functionTwoArguments || 
+              g[*vi].color == color_functionThreeArguments ||
+              g[*vi].color == color_functionFourOrMoreArguments ||
+              g[*vi].color == color_oneBracketSingle || 
+              g[*vi].color == color_oneBracketDouble || 
+              g[*vi].color == color_twoBrackets ||
+              g[*vi].color == color_arithmeticOperator ||
+              g[*vi].color == color_logicalOperator)
             {
                 tie(vi2, vi_end2) = vertices(g);
                 vi2 = vi;
@@ -269,6 +334,22 @@ void PostprocessingPDG::mergeTheSameInstructions(GraphType& g)
                     }
                     if(vertexPaired && g[*vi].uses == g[*vi2].uses)
                     {
+                      // Rcout << "merge the same:" << endl;
+                      // Rcout << "gen: " << g[*vi].gen << endl;
+                      //   Rcout << g[*vi].color << " " << g[*vi].name << ", " << g[*vi].functionName << endl;
+                      //   for(auto s : g[*vi].uses)
+                      //   {
+                      //     Rcout << s << ",";
+                      //   }
+                      //   Rcout << endl;
+                      // Rcout << "gen: " << g[*vi2].gen << endl;
+                      // Rcout << g[*vi2].color << " " << g[*vi2].name << ", " << g[*vi2].functionName << endl;
+                      // for(auto s : g[*vi2].uses)
+                      // {
+                      //   Rcout << s << ",";
+                      // }
+                      // Rcout << endl << "---"<< endl;
+                      
                         for (tie(out_e, out_e_end) = out_edges(*vi2, g);
                              out_e != out_e_end; ++out_e)
                         {
@@ -319,6 +400,49 @@ void PostprocessingPDG::mergeTheSameInstructions(GraphType& g)
             }
         }
     }
+}
+
+void PostprocessingPDG::removeSymbolNodes(GraphType& g)
+{
+  vector<vertex_t> toRemove;
+  graph_traits<GraphType>::vertex_iterator vi, vi_end, next;
+  tie(vi, vi_end) = vertices(g);
+  bool changes = true;
+  while(changes)
+  {
+    changes = false;
+    tie(vi, vi_end) = vertices(g);
+    for (next = vi; vi != vi_end; vi = next) {
+      ++next;
+      
+      if(g[*vi].lastInstruction && g[*vi].color == color_symbol)
+      {
+        changes = true;
+        toRemove.push_back(*vi);
+        break;
+      }
+    }
+    
+    for(size_t i=0;i<toRemove.size(); ++i)
+    {
+      clear_vertex(toRemove[i], g);
+      remove_vertex(toRemove[i], g);
+    }
+    toRemove.clear();
+  }
+}
+
+void PostprocessingPDG::colonToComparison(GraphType& g)
+{
+  graph_traits<GraphType>::vertex_iterator vi, vi_end, next;
+  tie(vi, vi_end) = vertices(g);
+  for (next = vi; vi != vi_end; vi = next) {
+    ++next;
+    if(g[*vi].color == color_colon)
+    {
+      g[*vi].color = color_comparisonOperator;
+    }
+  }
 }
 
 void PostprocessingPDG::memoryClean(GraphType& g)
