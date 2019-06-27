@@ -1,4 +1,4 @@
-78ff7d35c70c460ee5b02f3e905c5aa2 *DESCRIPTION
+09db808dbf5f8d04497640806fb0beaa *DESCRIPTION
 7ed575cfeb6f64a8e33e459ae2fe035d *NAMESPACE
 ee834ac13a46f3df4c34e4c6b64ef219 *R/RcppExports.R
 130eb56ed49b6f8b4fbd35ddf6547b0a *R/SimilaR_fromDirectory.R
@@ -31,8 +31,8 @@ b892c1a8ca9a7118290e5880620c7dbb *inst/testdata/data_notParsing/notParsing2.R
 a9db7cd7179e7a82d7ded819a7afd02b *man/SimilaR-package.Rd
 c09cd0c9444d07d54345ce3bd51da06f *man/SimilaR_fromDirectory.Rd
 d0f375a39ae65448cc81712e3874e2cc *man/SimilaR_fromTwoFunctions.Rd
-67289fa884ddbcb6a506a33f8571d6d3 *src/CDG.cpp
-2438f45fe98e27a83536258cde9a9428 *src/CDG.h
+dac20cc6bd29a884f7316597ebe06bce *src/CDG.cpp
+662db4407c2545132fd83a145ffa3633 *src/CDG.h
 70d4552d017cb6ac8cd139e964f32b38 *src/DDG.cpp
 b3ebe0c8384b74469d98a815db7fd128 *src/DDG.h
 e6aceea5f32455afebc346ef775245e3 *src/PDG.cpp
@@ -52,4 +52,4 @@ dfc36072c4ca0d42bfd50f1951ac7c37 *src/postprocessingPDG.cpp
 87c6745da90aa101fe49356c72b24e2c *tests/testthat.R
 32bd9399c3363b348c440c9a656ab709 *tests/testthat/test-SimilaR_fromDirectory.R
 41f5876a5a42fab13b2b65471bcd49fc *tests/testthat/test-SimilaR_fromTwoFunctions.R
-f104054653da473a309795790107715c *tests/testthat/test-algorithm.R
+4fc54ea799a2e55fb3938648a30fb4db *tests/testthat/test-algorithm.R
