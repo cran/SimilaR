@@ -1,4 +1,4 @@
-09db808dbf5f8d04497640806fb0beaa *DESCRIPTION
+c2ac429f07b537905a37a8e2c6433b89 *DESCRIPTION
 7ed575cfeb6f64a8e33e459ae2fe035d *NAMESPACE
 ee834ac13a46f3df4c34e4c6b64ef219 *R/RcppExports.R
 130eb56ed49b6f8b4fbd35ddf6547b0a *R/SimilaR_fromDirectory.R
@@ -31,14 +31,14 @@ b892c1a8ca9a7118290e5880620c7dbb *inst/testdata/data_notParsing/notParsing2.R
 a9db7cd7179e7a82d7ded819a7afd02b *man/SimilaR-package.Rd
 c09cd0c9444d07d54345ce3bd51da06f *man/SimilaR_fromDirectory.Rd
 d0f375a39ae65448cc81712e3874e2cc *man/SimilaR_fromTwoFunctions.Rd
-dac20cc6bd29a884f7316597ebe06bce *src/CDG.cpp
+c1aa9f02ede82db209289ac8a0618eb0 *src/CDG.cpp
 662db4407c2545132fd83a145ffa3633 *src/CDG.h
 70d4552d017cb6ac8cd139e964f32b38 *src/DDG.cpp
 b3ebe0c8384b74469d98a815db7fd128 *src/DDG.h
-e6aceea5f32455afebc346ef775245e3 *src/PDG.cpp
+3b617401635fc223e4ec08122a1fde36 *src/PDG.cpp
 8ce48857e4c1d08c34064141fa6713f7 *src/PDG.h
 dd788a61947df9bd419cbe7e74650776 *src/RcppExports.cpp
-94d421661a2299d9fd8cddd78dfbe986 *src/common.h
+df5355840f3d827a23374cfb0efb7e65 *src/common.h
 4d9b7445643d209cf14bde5f8832b545 *src/compare-gplag.cpp
 915fa6a453549fd1532534b7812161c4 *src/defs.h
 82be596c4453dc683378c4f4d0766fbe *src/generateDataFrame.cpp
@@ -47,7 +47,7 @@ d6d7ff031fd6825dbde01e462b6031ea *src/pdgcomparator.h
 722c4584d8852ff4067afc03ed2c0383 *src/pdgkernelcomparator.h
 7d517d6593c8f0bd808f7f04277d451b *src/pdgmykernelcomparator.cpp
 a5037fcfa86c07b7095eeeccb28ab90b *src/pdgmykernelcomparator.h
-dfc36072c4ca0d42bfd50f1951ac7c37 *src/postprocessingPDG.cpp
+154729e3918e0abe7fdbae18d3c1ac88 *src/postprocessingPDG.cpp
 494df2ca347f3370586fe1133e84a38d *src/postprocessingPDG.h
 87c6745da90aa101fe49356c72b24e2c *tests/testthat.R
 32bd9399c3363b348c440c9a656ab709 *tests/testthat/test-SimilaR_fromDirectory.R
