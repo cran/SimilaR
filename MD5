@@ -1,4 +1,4 @@
-c2ac429f07b537905a37a8e2c6433b89 *DESCRIPTION
+81ec56b15d861e0d238aafe97f655b0b *DESCRIPTION
 7ed575cfeb6f64a8e33e459ae2fe035d *NAMESPACE
 ee834ac13a46f3df4c34e4c6b64ef219 *R/RcppExports.R
 130eb56ed49b6f8b4fbd35ddf6547b0a *R/SimilaR_fromDirectory.R
@@ -38,7 +38,7 @@ b3ebe0c8384b74469d98a815db7fd128 *src/DDG.h
 3b617401635fc223e4ec08122a1fde36 *src/PDG.cpp
 8ce48857e4c1d08c34064141fa6713f7 *src/PDG.h
 dd788a61947df9bd419cbe7e74650776 *src/RcppExports.cpp
-df5355840f3d827a23374cfb0efb7e65 *src/common.h
+e400b5b0f2b43cfa221cd7d79dd95180 *src/common.h
 4d9b7445643d209cf14bde5f8832b545 *src/compare-gplag.cpp
 915fa6a453549fd1532534b7812161c4 *src/defs.h
 82be596c4453dc683378c4f4d0766fbe *src/generateDataFrame.cpp
